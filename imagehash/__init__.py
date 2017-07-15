@@ -41,7 +41,12 @@ __version__ = open(os.path.join(os.path.abspath(
 
 def _binary_array_to_hex(arr):
 	"""
-	internal function to make a hex string out of a binary array
+	internal function to make a hex string out of a binary array.
+
+	binary array might be created from comparison - for example, in 
+	average hash, each pixel in the image is compared with the average pixel value. 
+	If the pixel's value is less than the average it gets a 0 and if it's more it gets a 1.
+	Then we treat this like a string of bits and convert it to hexadecimal.
 	"""
 	h = 0
 	s = []
@@ -112,11 +117,21 @@ def average_hash(image, hash_size=8):
 
 	Implementation follows http://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html
 
+	Step by step explanation: https://www.safaribooksonline.com/blog/2013/11/26/image-hashing-with-python/
+
 	@image must be a PIL instance.
 	"""
+	if hash_size < 0:
+		raise ValueError("Hash size must be positive")
+
+	# reduce size and complexity, then covert to grayscale
 	image = image.convert("L").resize((hash_size, hash_size), Image.ANTIALIAS)
+
+	# find average pixel value; 'pixels' is an array of the pixel values, ranging from 0 (black) to 255 (white)
 	pixels = numpy.array(image.getdata()).reshape((hash_size, hash_size))
 	avg = pixels.mean()
+
+	# create string of bits
 	diff = pixels > avg
 	# make a hash
 	return ImageHash(diff)
@@ -130,6 +145,9 @@ def phash(image, hash_size=8, highfreq_factor=4):
 
 	@image must be a PIL instance.
 	"""
+	if hash_size < 0:
+		raise ValueError("Hash size must be positive")
+
 	import scipy.fftpack
 	img_size = hash_size * highfreq_factor
 	image = image.convert("L").resize((img_size, img_size), Image.ANTIALIAS)
@@ -171,6 +189,9 @@ def dhash(image, hash_size=8):
 	@image must be a PIL instance.
 	"""
 	# resize(w, h), but numpy.array((h, w))
+	if hash_size < 0:
+		raise ValueError("Hash size must be positive")
+
 	image = image.convert("L").resize((hash_size + 1, hash_size), Image.ANTIALIAS)
 	pixels = numpy.array(image.getdata(), dtype=numpy.float).reshape((hash_size, hash_size + 1))
 	# compute differences between columns
@@ -215,7 +236,9 @@ def whash(image, hash_size = 8, image_scale = None, mode = 'haar', remove_max_ha
 	if image_scale is not None:
 		assert image_scale & (image_scale - 1) == 0, "image_scale is not power of 2"
 	else:
-		image_scale = 2**int(numpy.log2(min(image.size)))
+		image_natural_scale = 2**int(numpy.log2(min(image.size)))
+		image_scale = max(image_natural_scale, hash_size)
+
 	ll_max_level = int(numpy.log2(image_scale))
 
 	level = int(numpy.log2(hash_size))
